@@ -9,13 +9,14 @@ import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165C
 import {IACPHook} from "../interfaces/IACPHook.sol";
 import {ACLConstants} from "../libraries/ACLConstants.sol";
 
-/// @title AgenticCommerce — ERC-8183 job escrow
-/// @dev Lifecycle: Open → Funded → Submitted → Completed / Rejected / Expired
-///      All hookable functions call IACPHook.beforeAction/afterAction when hook ≠ address(0).
+/// @title AgenticCommerce
+/// @notice ERC-8183 Agent Commerce Protocol job escrow.
+/// @dev Lifecycle: Open -> Funded -> Submitted -> Completed / Rejected / Expired.
+///      Hookable functions invoke IACPHook.beforeAction / afterAction with a hard
+///      gas cap (HOOK_GAS_LIMIT) so a misbehaving hook cannot brick the contract.
+///      All hook payloads follow the normative ERC-8183 encoding for each selector.
 contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
-
-    // ───────── Types ─────────
 
     enum JobStatus {
         Open,
@@ -38,7 +39,11 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         address hook;
     }
 
-    // ───────── State ─────────
+    /// @notice Hard gas cap for every hook call (before/after).
+    /// @dev ERC-8183 RECOMMENDS bounding hook execution. 2M gas is more than enough
+    ///      for typical NFT escrow / reputation writes while leaving room for the
+    ///      caller's own logic and refunds; out-of-gas in a hook reverts the call.
+    uint256 public constant HOOK_GAS_LIMIT = 2_000_000;
 
     IERC20 public immutable paymentToken;
     uint256 public platformFeeBps;
@@ -49,8 +54,6 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
     mapping(uint256 => Job) internal _jobs;
     mapping(uint256 => bool) public jobHasBudget;
     mapping(address => bool) public whitelistedHooks;
-
-    // ───────── Events ─────────
 
     event JobCreated(
         uint256 indexed jobId,
@@ -100,8 +103,6 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
     );
     event HookWhitelistUpdated(address indexed hook, bool status);
 
-    // ───────── Errors ─────────
-
     error InvalidJob();
     error WrongStatus();
     error Unauthorized();
@@ -116,8 +117,6 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
     error HookInterfaceUnsupported();
     error NotExpired();
 
-    // ───────── Constructor ─────────
-
     constructor(
         address paymentToken_,
         address treasury_,
@@ -130,7 +129,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         whitelistedHooks[address(0)] = true;
     }
 
-    // ───────── Admin ─────────
+    // ---------- Admin ----------
 
     function setPlatformFee(
         uint256 feeBps_,
@@ -155,17 +154,22 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         emit HookWhitelistUpdated(hook, status);
     }
 
-    // ───────── Hook helpers ─────────
+    // ---------- Hook plumbing ----------
 
+    /// @dev Hook calls forward at most HOOK_GAS_LIMIT gas. Any revert in the
+    ///      hook propagates with its original reason so dApps can debug.
     function _beforeHook(
         address hook,
         uint256 jobId,
         bytes4 selector_,
         bytes memory data
     ) internal {
-        if (hook != address(0)) {
-            IACPHook(hook).beforeAction(jobId, selector_, data);
-        }
+        if (hook == address(0)) return;
+        IACPHook(hook).beforeAction{gas: HOOK_GAS_LIMIT}(
+            jobId,
+            selector_,
+            data
+        );
     }
 
     function _afterHook(
@@ -174,14 +178,13 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         bytes4 selector_,
         bytes memory data
     ) internal {
-        if (hook != address(0)) {
-            IACPHook(hook).afterAction(jobId, selector_, data);
-        }
+        if (hook == address(0)) return;
+        IACPHook(hook).afterAction{gas: HOOK_GAS_LIMIT}(jobId, selector_, data);
     }
 
-    // ───────── Core functions ─────────
+    // ---------- Core ----------
 
-    /// @notice Create a new job. Provider MAY be address(0) (set later via setProvider).
+    /// @notice Create a job. provider MAY be address(0) and set later via setProvider.
     function createJob(
         address provider,
         address evaluator,
@@ -228,7 +231,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         return jobId;
     }
 
-    /// @notice Set provider on a job created without one. Client-only, Open status only.
+    /// @notice Set provider on an Open job. Client-only.
     function setProvider(
         uint256 jobId,
         address provider_,
@@ -250,7 +253,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         _afterHook(job.hook, jobId, msg.sig, data);
     }
 
-    /// @notice Set budget. Callable by provider.
+    /// @notice Set budget on an Open job. Either client or provider may call.
     function setBudget(
         uint256 jobId,
         uint256 amount,
@@ -259,7 +262,8 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         Job storage job = _jobs[jobId];
         if (job.id == 0) revert InvalidJob();
         if (job.status != JobStatus.Open) revert WrongStatus();
-        if (msg.sender != job.provider) revert Unauthorized();
+        if (msg.sender != job.provider && msg.sender != job.client)
+            revert Unauthorized();
 
         bytes memory data = abi.encode(amount, optParams);
         _beforeHook(job.hook, jobId, msg.sig, data);
@@ -271,7 +275,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         _afterHook(job.hook, jobId, msg.sig, data);
     }
 
-    /// @notice Fund escrow. Client-only. Includes front-running protection (expectedBudget).
+    /// @notice Fund escrow. Client-only. expectedBudget guards against front-running re-budget.
     function fund(
         uint256 jobId,
         uint256 expectedBudget,
@@ -356,7 +360,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         _afterHook(job.hook, jobId, msg.sig, data);
     }
 
-    /// @notice Reject a job. Client when Open; evaluator when Funded or Submitted.
+    /// @notice Reject a job. Client-only when Open. Evaluator-only when Funded or Submitted.
     function reject(
         uint256 jobId,
         bytes32 reason,
@@ -394,7 +398,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         _afterHook(job.hook, jobId, msg.sig, data);
     }
 
-    /// @notice Refund after expiry. NOT hookable.
+    /// @notice Refund client after expiry. Not hookable.
     function claimRefund(uint256 jobId) external nonReentrant {
         Job storage job = _jobs[jobId];
         if (job.id == 0) revert InvalidJob();
@@ -412,7 +416,7 @@ contract AgenticCommerce is Ownable2Step, ReentrancyGuard {
         emit JobExpired(jobId);
     }
 
-    // ───────── View ─────────
+    // ---------- Views ----------
 
     function getJob(uint256 jobId) external view returns (Job memory) {
         return _jobs[jobId];
