@@ -176,10 +176,14 @@ contract ACLIdentityRegistry is ERC721URIStorage, EIP712, IERC8004Identity {
         emit MetadataSet(agentId, _AGENT_WALLET_KEY, _AGENT_WALLET_KEY, empty);
     }
 
-    // ---------- ENSIP-25 helper ----------
+    // ---------- ERC-8004 helper ----------
 
-    /// @notice ENSIP-25 expects the agent registry to expose the {agentId, registry, chainId}
-    ///         tuple as numeric values. CCIP-Read gateways encode the response as text records.
+    /// @notice CAIP-10 string identifying this registry on its host chain.
+    ///         Returns `eip155:<chainId>:<registryAddress>`, which is the exact
+    ///         shape ERC-8004 v2 expects for `registrations[].agentRegistry` in
+    ///         the agent registration file. Reverts with `UnknownAgent` when
+    ///         `agentId` has not been minted, so callers building the
+    ///         registration JSON get a single-call existence + identifier check.
     function agentRegistryURI(
         uint256 agentId
     ) external view returns (string memory) {
