@@ -82,6 +82,33 @@ interface IERC8004Reputation {
             bool isRevoked
         );
 
+    /// @notice Read every feedback entry for `agentId`, optionally filtered.
+    /// @dev Per the ERC-8004 v2 spec, only `agentId` is mandatory. Pass an
+    ///      empty `clientAddresses` array to read across all clients (the
+    ///      registry resolves it via the on-chain client list); pass empty
+    ///      `tag1` / `tag2` to skip the corresponding filter. Revoked
+    ///      entries are omitted unless `includeRevoked` is true. The seven
+    ///      returned arrays are positional — element `i` describes the same
+    ///      feedback entry across `clients[i]`, `feedbackIndexes[i]`, etc.
+    function readAllFeedback(
+        uint256 agentId,
+        address[] calldata clientAddresses,
+        string calldata tag1,
+        string calldata tag2,
+        bool includeRevoked
+    )
+        external
+        view
+        returns (
+            address[] memory clients,
+            uint64[] memory feedbackIndexes,
+            int128[] memory values,
+            uint8[] memory valueDecimals,
+            string[] memory tag1s,
+            string[] memory tag2s,
+            bool[] memory revokedStatuses
+        );
+
     function getClients(
         uint256 agentId
     ) external view returns (address[] memory);
