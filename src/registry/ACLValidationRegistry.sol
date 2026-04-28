@@ -35,7 +35,6 @@ contract ACLValidationRegistry is IERC8004Validation {
     error UnknownRequest();
     error NotAuthorizedValidator();
     error InvalidResponse();
-    error EmptyRequestURI();
 
     /// @notice Bind this registry to an Identity Registry. Single-shot.
     function initialize(address identityRegistry_) external {
@@ -57,7 +56,6 @@ contract ACLValidationRegistry is IERC8004Validation {
         bytes32 requestHash
     ) external {
         if (!_initialized) revert NotInitialized();
-        if (bytes(requestURI).length == 0) revert EmptyRequestURI();
 
         IERC721 identity = IERC721(_identityRegistry);
         address agentOwner = identity.ownerOf(agentId);

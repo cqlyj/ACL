@@ -311,6 +311,145 @@ contract ACLReputationRegistry is IERC8004Reputation {
     }
 
     /// @inheritdoc IERC8004Reputation
+    /// @dev Two passes (count, then fill) so we can size the return arrays
+    ///      exactly. We avoid one massive frame by isolating the inner loop in
+    ///      a helper; the six-output variant is mandated by the spec.
+    function readAllFeedback(
+        uint256 agentId,
+        address[] calldata clientAddresses,
+        string calldata tag1,
+        string calldata tag2,
+        bool includeRevoked
+    )
+        external
+        view
+        returns (
+            address[] memory clients,
+            uint64[] memory feedbackIndexes,
+            int128[] memory values,
+            uint8[] memory valueDecimals,
+            string[] memory tag1s,
+            string[] memory tag2s,
+            bool[] memory revokedStatuses
+        )
+    {
+        // Spec: clientAddresses is optional. When empty, expand to every
+        // client that ever wrote feedback for this agent. Indexers that
+        // pre-page the result MUST pass the slice they care about explicitly.
+        address[] memory cohort = clientAddresses.length == 0
+            ? _clients[agentId]
+            : _toMemoryArray(clientAddresses);
+
+        bytes32 t1Hash = bytes(tag1).length == 0
+            ? bytes32(0)
+            : keccak256(bytes(tag1));
+        bytes32 t2Hash = bytes(tag2).length == 0
+            ? bytes32(0)
+            : keccak256(bytes(tag2));
+
+        uint256 total = _readAllCount(
+            agentId,
+            cohort,
+            t1Hash,
+            t2Hash,
+            includeRevoked
+        );
+
+        clients = new address[](total);
+        feedbackIndexes = new uint64[](total);
+        values = new int128[](total);
+        valueDecimals = new uint8[](total);
+        tag1s = new string[](total);
+        tag2s = new string[](total);
+        revokedStatuses = new bool[](total);
+
+        if (total == 0) return (clients, feedbackIndexes, values, valueDecimals, tag1s, tag2s, revokedStatuses);
+
+        _readAllFill(
+            agentId,
+            cohort,
+            t1Hash,
+            t2Hash,
+            includeRevoked,
+            clients,
+            feedbackIndexes,
+            values,
+            valueDecimals,
+            tag1s,
+            tag2s,
+            revokedStatuses
+        );
+    }
+
+    function _readAllCount(
+        uint256 agentId,
+        address[] memory cohort,
+        bytes32 t1Hash,
+        bytes32 t2Hash,
+        bool includeRevoked
+    ) internal view returns (uint256 total) {
+        for (uint256 i = 0; i < cohort.length; i++) {
+            FeedbackEntry[] storage list = _feedback[agentId][cohort[i]];
+            for (uint256 j = 0; j < list.length; j++) {
+                FeedbackEntry storage e = list[j];
+                if (!includeRevoked && e.isRevoked) continue;
+                if (t1Hash != bytes32(0) && keccak256(bytes(e.tag1)) != t1Hash)
+                    continue;
+                if (t2Hash != bytes32(0) && keccak256(bytes(e.tag2)) != t2Hash)
+                    continue;
+                total++;
+            }
+        }
+    }
+
+    /// @dev Split out so the parent function does not hold every storage
+    ///      pointer plus the seven memory output handles in the same frame.
+    function _readAllFill(
+        uint256 agentId,
+        address[] memory cohort,
+        bytes32 t1Hash,
+        bytes32 t2Hash,
+        bool includeRevoked,
+        address[] memory clients,
+        uint64[] memory feedbackIndexes,
+        int128[] memory values,
+        uint8[] memory valueDecimals,
+        string[] memory tag1s,
+        string[] memory tag2s,
+        bool[] memory revokedStatuses
+    ) internal view {
+        uint256 cursor;
+        for (uint256 i = 0; i < cohort.length; i++) {
+            address client = cohort[i];
+            FeedbackEntry[] storage list = _feedback[agentId][client];
+            for (uint256 j = 0; j < list.length; j++) {
+                FeedbackEntry storage e = list[j];
+                if (!includeRevoked && e.isRevoked) continue;
+                if (t1Hash != bytes32(0) && keccak256(bytes(e.tag1)) != t1Hash)
+                    continue;
+                if (t2Hash != bytes32(0) && keccak256(bytes(e.tag2)) != t2Hash)
+                    continue;
+                clients[cursor] = client;
+                // Indexes are 1-based per ERC-8004 v2.
+                feedbackIndexes[cursor] = uint64(j + 1);
+                values[cursor] = e.value;
+                valueDecimals[cursor] = e.valueDecimals;
+                tag1s[cursor] = e.tag1;
+                tag2s[cursor] = e.tag2;
+                revokedStatuses[cursor] = e.isRevoked;
+                cursor++;
+            }
+        }
+    }
+
+    function _toMemoryArray(
+        address[] calldata src
+    ) private pure returns (address[] memory dst) {
+        dst = new address[](src.length);
+        for (uint256 i = 0; i < src.length; i++) dst[i] = src[i];
+    }
+
+    /// @inheritdoc IERC8004Reputation
     function getClients(
         uint256 agentId
     ) external view returns (address[] memory) {
