@@ -1,0 +1,13 @@
+{
+  "PrivateKeyPath": "keys/node-b.pem",
+  "Peers": ["tls://127.0.0.1:9001"],
+  "Listen": ["tls://0.0.0.0:9011"],
+  "api_port": 9012,
+  "tcp_port": 7000,
+  "_comment_tcp_port": "Virtual port inside the gVisor/Yggdrasil overlay. Both nodes MUST use the same value because the dialer uses its own tcp_port as the destination port.",
+  "bridge_addr": "127.0.0.1",
+  "max_message_size": 16777216,
+  "max_concurrent_conns": 128,
+  "conn_read_timeout_secs": 60,
+  "conn_idle_timeout_secs": 300
+}
