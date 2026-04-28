@@ -159,6 +159,86 @@ contract ACLReputationRegistryTest is Test {
         assertEq(clients.length, 2);
     }
 
+    function test_readAllFeedback_filtersAndIncludesRevoked() public {
+        vm.prank(client);
+        reputation.giveFeedback(
+            agentId,
+            100,
+            2,
+            "ok",
+            "good",
+            "",
+            "",
+            bytes32(0)
+        );
+        vm.prank(client);
+        reputation.giveFeedback(
+            agentId,
+            50,
+            2,
+            "ok",
+            "bad",
+            "",
+            "",
+            bytes32(0)
+        );
+        vm.prank(client2);
+        reputation.giveFeedback(
+            agentId,
+            200,
+            2,
+            "fail",
+            "",
+            "",
+            "",
+            bytes32(0)
+        );
+        vm.prank(client);
+        reputation.revokeFeedback(agentId, 1);
+
+        // Empty cohort => all clients; tag1="ok"; default excludes revoked.
+        address[] memory empty = new address[](0);
+        (
+            address[] memory clients,
+            uint64[] memory idxs,
+            int128[] memory values,
+            uint8[] memory decimals,
+            string[] memory tag1s,
+            string[] memory tag2s,
+            bool[] memory revoked
+        ) = reputation.readAllFeedback(agentId, empty, "ok", "", false);
+
+        assertEq(clients.length, 1);
+        assertEq(clients[0], client);
+        assertEq(idxs[0], 2);
+        assertEq(values[0], 50);
+        assertEq(decimals[0], 2);
+        assertEq(keccak256(bytes(tag1s[0])), keccak256(bytes("ok")));
+        assertEq(keccak256(bytes(tag2s[0])), keccak256(bytes("bad")));
+        assertFalse(revoked[0]);
+
+        // includeRevoked=true with no filter returns everything (3 entries).
+        (address[] memory cAll, , , , , , bool[] memory rAll) = reputation
+            .readAllFeedback(agentId, empty, "", "", true);
+        assertEq(cAll.length, 3);
+        bool sawRevoked;
+        for (uint256 i = 0; i < rAll.length; i++)
+            sawRevoked = sawRevoked || rAll[i];
+        assertTrue(sawRevoked);
+
+        // Cohort filter narrows to client2 only; no entries match tag1="ok".
+        address[] memory only2 = new address[](1);
+        only2[0] = client2;
+        (address[] memory c2, , , , , , ) = reputation.readAllFeedback(
+            agentId,
+            only2,
+            "ok",
+            "",
+            false
+        );
+        assertEq(c2.length, 0);
+    }
+
     function test_appendResponse() public {
         vm.prank(client);
         reputation.giveFeedback(agentId, 1, 0, "", "", "", "", bytes32(0));

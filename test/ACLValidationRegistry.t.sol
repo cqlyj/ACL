@@ -100,6 +100,16 @@ contract ACLValidationRegistryTest is Test {
         );
     }
 
+    function test_validationRequest_emptyRequestURI_allowed() public {
+        bytes32 reqHash = keccak256("req-empty");
+        vm.prank(agentOwner);
+        validation.validationRequest(validator, agentId, "", reqHash);
+
+        bytes32[] memory list = validation.getAgentValidations(agentId);
+        assertEq(list.length, 1);
+        assertEq(list[0], reqHash);
+    }
+
     function test_summary_average() public {
         bytes32 r1 = keccak256("r1");
         bytes32 r2 = keccak256("r2");
