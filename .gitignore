@@ -3,12 +3,30 @@ cache/
 out/
 
 # Ignores development broadcast logs
-!/broadcast
-/broadcast/*/31337/
-/broadcast/**/dry-run/
+broadcast/
 
 # Docs
 docs/
 
 # Dotenv file
 .env
+.env.deployed.*
+
+# AXL build artifacts
+axl/axl-src/
+axl/node
+axl/keys/*.pem
+
+# Libs
+/lib/
+
+# Lock file
+foundry.lock
+
+# SDK (bun workspace)
+node_modules/
+sdk/node_modules/
+sdk/packages/*/dist/
+sdk/packages/*/node_modules/
+sdk/.turbo/
+*.tsbuildinfo
