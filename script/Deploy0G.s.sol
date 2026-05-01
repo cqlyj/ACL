@@ -5,6 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {ACLTestUSDC} from "../src/token/ACLTestUSDC.sol";
 import {AgenticCommerce} from "../src/core/AgenticCommerce.sol";
 import {ACLEvaluator} from "../src/core/ACLEvaluator.sol";
+import {IInferenceServing} from "../src/interfaces/IInferenceServing.sol";
 import {ACLIdentityRegistry} from "../src/registry/ACLIdentityRegistry.sol";
 import {ACLReputationRegistry} from "../src/registry/ACLReputationRegistry.sol";
 import {ACLValidationRegistry} from "../src/registry/ACLValidationRegistry.sol";
@@ -22,6 +23,10 @@ contract Deploy0G is Script {
         address treasury = vm.envAddress("PLATFORM_TREASURY");
         address evaluatorOwner = vm.envAddress("EVALUATOR_OWNER");
         address oracleAddress = vm.envAddress("ORACLE_ADDRESS");
+        address inferenceServing = vm.envOr(
+            "ZG_INFERENCE_SERVING",
+            address(0xa79F4c8311FF93C06b8CfB403690cc987c93F91E)
+        );
 
         vm.startBroadcast();
 
@@ -35,7 +40,10 @@ contract Deploy0G is Script {
         );
         console.log("AgenticCommerce:", address(commerce));
 
-        ACLEvaluator evaluator = new ACLEvaluator(evaluatorOwner);
+        ACLEvaluator evaluator = new ACLEvaluator(
+            evaluatorOwner,
+            IInferenceServing(inferenceServing)
+        );
         console.log("ACLEvaluator:", address(evaluator));
 
         ACLIdentityRegistry identity = new ACLIdentityRegistry();
