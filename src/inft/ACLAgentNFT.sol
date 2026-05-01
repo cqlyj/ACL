@@ -146,6 +146,41 @@ contract ACLAgentNFT is ERC721, Ownable2Step, IERC7857, IERC7857Metadata {
         return tokenId;
     }
 
+    /// @notice Replace the on-chain IntelligentData[] (and optionally the
+    ///         encrypted-storage URI) for a token the caller owns or is
+    ///         approved on.
+    /// @dev    Required for the live-corpus refresh design used by ERC-7857
+    ///         iNFT commerce: after each off-chain delivery the seller
+    ///         re-encrypts the corpus, uploads the new ciphertext to 0G
+    ///         Storage, and calls `update(tokenId, newDatas, newURI)` so the
+    ///         on-chain `dataHash` and `encryptedStorageURIs[tokenId]` agree
+    ///         with the freshly uploaded blob.
+    ///
+    ///         Pass `newEncryptedStorageURI = ""` to leave the URI untouched
+    ///         (e.g. for a recipient-side re-encryption flow where only the
+    ///         ciphertext keys change but the storage location is reused).
+    ///
+    function update(
+        uint256 tokenId,
+        IntelligentData[] calldata newDatas,
+        string calldata newEncryptedStorageURI
+    ) external {
+        if (!_isApprovedOrOwner(msg.sender, tokenId))
+            revert NotTokenOwnerOrApproved();
+        if (newDatas.length == 0) revert EmptyIntelligentData();
+
+        delete _intelligentData[tokenId];
+        for (uint256 i = 0; i < newDatas.length; i++) {
+            _intelligentData[tokenId].push(newDatas[i]);
+        }
+
+        if (bytes(newEncryptedStorageURI).length > 0) {
+            encryptedStorageURIs[tokenId] = newEncryptedStorageURI;
+        }
+
+        emit IntelligentDataUpdated(tokenId);
+    }
+
     // ---------- ERC-7857: iTransfer ----------
 
     /// @inheritdoc IERC7857
