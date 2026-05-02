@@ -1,0 +1,22 @@
+{
+  "name": "@acl/inft",
+  "version": "0.1.0",
+  "description": "ERC-7857 iNFT helpers for ACL: encrypt/decrypt intelligent data, sign ownership/access proofs, build TransferValidityProof[], INftClient wrapper, and the inftDeliveryHook(...) HookConfig factory.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -b",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "@acl/core": "workspace:*",
+    "@acl/storage": "workspace:*",
+    "eciesjs": "^0.4.18",
+    "viem": "^2.21.0"
+  }
+}
