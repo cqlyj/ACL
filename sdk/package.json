@@ -1,0 +1,42 @@
+{
+  "name": "@acl/workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ACL — verifiable agent commerce SDK (bun workspace).",
+  "type": "module",
+  "workspaces": ["packages/*", "../examples/*"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
+    "fmt": "biome format --write packages/*/src",
+    "lint": "biome check packages/*/src",
+    "sync-abis": "bun run scripts/sync-abis.ts",
+    "gateway:dev": "bun run --filter @acl/gateway dev",
+    "gateway:start": "bun run --filter @acl/gateway start"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "dependencies": {
+    "@0gfoundation/0g-ts-sdk": "^1.2.6",
+    "@0glabs/0g-serving-broker": "^0.7.5",
+    "@acl/agent": "workspace:*",
+    "@acl/core": "workspace:*",
+    "@acl/discovery": "workspace:*",
+    "@acl/evaluation": "workspace:*",
+    "@acl/gateway": "workspace:*",
+    "@acl/negotiation": "workspace:*",
+    "@acl/settlement": "workspace:*",
+    "@acl/storage": "workspace:*",
+    "ethers": "^6.13.4",
+    "hono": "^4.12.14",
+    "viem": "^2.21.0"
+  }
+}

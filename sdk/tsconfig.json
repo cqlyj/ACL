@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/storage" },
+    { "path": "./packages/discovery" },
+    { "path": "./packages/negotiation" },
+    { "path": "./packages/settlement" },
+    { "path": "./packages/evaluation" },
+    { "path": "./packages/inft" },
+    { "path": "./packages/gateway" },
+    { "path": "./packages/agent" }
+  ]
+}
