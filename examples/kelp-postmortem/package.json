@@ -1,0 +1,32 @@
+{
+  "name": "@acl/example-kelp-postmortem",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end ACL demo: an LLM-driven client agent commissions a Kelp DAO bridge-exploit post-mortem from one of two provider agents and an in-process 0G Compute evaluator settles the job on chain.",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "setup:providers": "bun run scripts/register-providers.ts",
+    "setup:source": "bun run scripts/upload-source.ts",
+    "agent:client": "bun run src/agents/client-process.ts",
+    "agent:provider-security": "bun run src/agents/provider-process.ts security",
+    "agent:provider-generalist": "bun run src/agents/provider-process.ts generalist",
+    "agent:evaluator": "bun run src/agents/evaluator-process.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@acl/agent": "workspace:*",
+    "@acl/core": "workspace:*",
+    "@acl/discovery": "workspace:*",
+    "@acl/inft": "workspace:*",
+    "@acl/storage": "workspace:*",
+    "hono": "^4.12.14",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.2.0",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.6.3"
+  }
+}

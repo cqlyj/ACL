@@ -1,0 +1,8 @@
+node_modules
+.env
+.env.local
+.axl/*.pem
+.axl/*.json
+private/*.pem
+.tmp
+.demo-pids/

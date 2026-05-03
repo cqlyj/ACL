@@ -1,0 +1,10 @@
+{
+  "extends": "../../sdk/tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "composite": false,
+    "types": ["bun", "node"]
+  },
+  "include": ["src/**/*", "scripts/**/*"]
+}
