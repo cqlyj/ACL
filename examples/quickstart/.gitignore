@@ -1,0 +1,5 @@
+.env
+.axl/*.pem
+.axl/*.config.json
+.axl/*.id
+node_modules

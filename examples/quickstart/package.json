@@ -1,0 +1,22 @@
+{
+  "name": "@acl/quickstart",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "bun run src/setup.ts",
+    "provider": "bun run src/provider.ts",
+    "evaluator": "bun run src/evaluator.ts",
+    "client": "bun run src/client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@acl/agent": "workspace:*",
+    "viem": "^2.40.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.6.3"
+  }
+}
