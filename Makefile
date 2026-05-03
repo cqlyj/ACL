@@ -1,11 +1,18 @@
 SHELL := /bin/bash
-include .env
+-include .env
 export
 
+.DEFAULT_GOAL := help
+
 .PHONY: build test fmt lint clean deploy-0g deploy-sepolia register-agent \
-        set-agent-metadata axl-setup axl-start-a axl-start-b axl-stop \
-        axl-smoke axl-clean verify-0g verify-sepolia merge-env help \
-        setup-ens set-resolver-url snapshot test-gas
+        redeploy-evaluator redeploy-agent-nft set-agent-metadata axl-setup \
+        axl-start-a axl-start-b axl-stop axl-smoke axl-clean verify-0g \
+        verify-sepolia merge-env help setup-ens set-resolver-url snapshot \
+        test-gas demo-reset-inft demo-register-providers \
+        gateway sdk-test sdk-typecheck \
+        quickstart-install quickstart-setup quickstart-gateway \
+        quickstart-provider quickstart-evaluator quickstart-client \
+        quickstart-clean
 
 # ----- Build & Test -----
 
@@ -33,10 +40,13 @@ clean:
 
 # ----- Deploy: 0G Galileo -----
 
-# 0G Galileo currently rejects tx with priority fee < 2 gwei. Force legacy
-# pricing + a fixed gas price so the deployer doesn't need to remember either.
-ZG_GAS_PRICE := 5gwei
-ZG_FLAGS := --legacy --with-gas-price $(ZG_GAS_PRICE)
+# 0G Galileo natively supports EIP-1559 — the prior `--legacy
+# --with-gas-price 5gwei` defensive defaults turned out to be a
+# Foundry-side opinion, not a chain requirement. We rely on Foundry's
+# default 1559 gas estimation now. If a specific RPC ever rejects
+# 1559 (none observed at time of writing) override on the command line:
+#   make deploy-0g ZG_FLAGS='--legacy --with-gas-price 5gwei'
+ZG_FLAGS :=
 
 deploy-0g:
 	forge script script/Deploy0G.s.sol \
@@ -47,6 +57,36 @@ deploy-0g:
 	@echo ""
 	@echo "Deployed addresses written to .env.deployed.0g"
 	@echo "Run 'make merge-env' to merge them into .env."
+
+# Redeploy ONLY the ACLEvaluator (e.g. after a constructor change or a
+# wrong InferenceServing wiring). Other contracts are unchanged so their
+# addresses stay valid. Writes .env.deployed.0g; merge with `make merge-env`.
+redeploy-evaluator:
+	forge script script/RedeployEvaluator.s.sol \
+		--rpc-url $(ZG_RPC) \
+		--private-key $(DEPLOYER_PRIVATE_KEY) \
+		$(ZG_FLAGS) \
+		--broadcast
+	@echo ""
+	@echo "ACLEvaluator address written to .env.deployed.0g"
+	@echo "Run 'make merge-env' to merge it into .env, then re-run"
+	@echo "register-providers / set-operator for the new contract."
+
+# Redeploy ONLY the ACLAgentNFT contract (after the live-corpus refresh
+# `update()` addition). Reuses the existing TrustedPartyVerifier; the
+# INFTDeliveryHook does NOT need redeployment because it reads the NFT
+# contract address per-job from setBudget optParams. Existing iNFTs on
+# the old contract are abandoned. Writes .env.deployed.0g; merge with
+# `make merge-env`, then re-run register-providers to mint fresh iNFTs.
+redeploy-agent-nft:
+	forge script script/RedeployAgentNFT.s.sol \
+		--rpc-url $(ZG_RPC) \
+		--private-key $(DEPLOYER_PRIVATE_KEY) \
+		$(ZG_FLAGS) \
+		--broadcast
+	@echo ""
+	@echo "ACLAgentNFT address written to .env.deployed.0g"
+	@echo "Run 'make merge-env' to merge it into .env."
 
 ZG_VERIFIER_URL := https://chainscan-galileo.0g.ai/open/api
 ZG_VERIFY := forge verify-contract --chain-id 16602 --num-of-optimizations 200 \
@@ -63,7 +103,7 @@ verify-0g:
 		--constructor-args $$(cast abi-encode "constructor(address,address,address)" $$ACL_TEST_USDC $(PLATFORM_TREASURY) $(DEPLOYER_ADDRESS))
 	@source .env.deployed.0g && $(ZG_VERIFY) \
 		$$ACL_EVALUATOR src/core/ACLEvaluator.sol:ACLEvaluator \
-		--constructor-args $$(cast abi-encode "constructor(address)" $(EVALUATOR_OWNER))
+		--constructor-args $$(cast abi-encode "constructor(address,address)" $(EVALUATOR_OWNER) $$ZG_INFERENCE_SERVING)
 	@source .env.deployed.0g && $(ZG_VERIFY) \
 		$$ACL_IDENTITY_REGISTRY src/registry/ACLIdentityRegistry.sol:ACLIdentityRegistry
 	@source .env.deployed.0g && $(ZG_VERIFY) \
@@ -200,6 +240,108 @@ merge-env:
 	fi
 	@echo "Done. Check .env for updated values."
 
+# ----- Demo: kelp-postmortem example app -----
+
+# Re-mint a fresh pair of provider iNFTs for the kelp-postmortem demo.
+# Use this when Phase-2 (iNFT acquisition) was already exercised in a
+# prior run — the buyer now owns the previous tokenIds, so BuyerFlow
+# would short-circuit to SKIP. Drops the cached `.axl/*.token-id`
+# files and re-runs `setup:providers`, which mints + encrypts a fresh
+# corpus + advertises the new tokenIds in `agent-context`.
+demo-reset-inft:
+	@echo "Resetting kelp-postmortem iNFT cache + re-running provider setup..."
+	@rm -f examples/kelp-postmortem/.axl/kelp-security.token-id \
+	       examples/kelp-postmortem/.axl/kelp-generalist.token-id
+	cd examples/kelp-postmortem && bun run setup:providers
+	@echo ""
+	@echo "Fresh iNFTs minted. Restart the coordinator (bun run dev) to"
+	@echo "exercise both Flow-1 and Flow-2 in the next run."
+
+# Programmatically register the kelp-postmortem provider agents (ENS,
+# AXL peer, mint-or-reuse iNFT, encrypt seed corpus). Idempotent:
+# safely re-runs; honours `.axl/*.token-id` cache. Use this on a
+# fresh checkout before `bun run dev`.
+demo-register-providers:
+	cd examples/kelp-postmortem && bun run setup:providers
+
+# One-shot: bring the comprehensive web demo all the way up.
+#   - boots the CCIP-Read gateway in the background if not already on :3000
+#   - registers kelp-security + kelp-generalist if their iNFTs aren't minted
+#   - pins the Kelp post-mortem source to 0G Storage if KELP_SOURCE_ROOT is missing
+#   - boots the coordinator + waits for /api/config
+# When the script returns, http://127.0.0.1:8787 is browser-ready.
+demo-up:
+	@bash examples/kelp-postmortem/scripts/demo-up.sh
+
+# Tear down everything `demo-up` started: coord (cascades SIGTERM to its
+# 7 child procs — 3 AXL bridges + 4 agents) + gateway. Falls back to a
+# pgrep sweep so stale pid files don't leak zombies. Verifies ports
+# 3000 / 8787 / 9101–9103 are free at the end.
+demo-down:
+	@bash examples/kelp-postmortem/scripts/demo-down.sh
+
+# ----- SDK workspace -----
+
+sdk-typecheck:
+	cd sdk && bun run typecheck
+
+sdk-test:
+	cd sdk && bun run test
+
+# Boot the local CCIP-Read gateway. Reads keys + addresses from .env,
+# listens on :3000 by default. Used by both examples to power
+# `*.acl.eth` resolution + `searchAgents()` discovery.
+gateway:
+	cd sdk && bun run gateway:start
+
+# ----- Quickstart (examples/quickstart) ---------------------------------------
+#
+# Minimal CLI demo: one client, one provider, one evaluator — each in
+# its own terminal, each spawning its own Gensyn AXL bridge (separate
+# AXL nodes, peer-to-peer over TLS) — exercises ENS + 0G Storage +
+# 0G Compute + ERC-8183 + ENSIP-10 CCIP-Read end-to-end in ~150 LoC.
+#
+# Recommended layout (4 terminals):
+#   T0:  make quickstart-gateway      (CCIP-Read gateway on :3000)
+#   T1:  make quickstart-provider     (provider AXL bridge + agent)
+#   T2:  make quickstart-evaluator    (0G Compute evaluator)
+#   T3:  make quickstart-setup        (one-time on-chain registration)
+#        make quickstart-client       (one buyer job, end-to-end)
+
+# Install (workspace-aware) — usually a no-op since `bun install` from
+# the sdk workspace already linked `examples/quickstart`.
+quickstart-install:
+	cd sdk && bun install
+
+# One-time. Registers the provider on ACLIdentityRegistry, publishes
+# its ACL metadata, and caches the AXL peer id under `.axl/`.
+quickstart-setup:
+	cd examples/quickstart && bun run setup
+
+# T0 — local CCIP-Read gateway. Prefer this over a public testnet
+# gateway so the indexer is in a known state for the demo.
+quickstart-gateway: gateway
+
+# T1 — provider agent + AXL bridge.
+quickstart-provider:
+	cd examples/quickstart && bun run provider
+
+# T2 — 0G Compute evaluator. No AXL bridge needed — the evaluator
+# only listens to the chain.
+quickstart-evaluator:
+	cd examples/quickstart && bun run evaluator
+
+# T3 — fires one end-to-end commerce job and exits when settled.
+quickstart-client:
+	cd examples/quickstart && bun run client
+
+# Wipe the cached AXL peer keys + agent id. Re-run `quickstart-setup`
+# afterwards to rebuild them.
+quickstart-clean:
+	rm -f examples/quickstart/.axl/*.pem \
+	      examples/quickstart/.axl/*.config.json \
+	      examples/quickstart/.axl/*.agent-id
+
 # ----- Help -----
 
 help:
@@ -234,6 +376,26 @@ help:
 	@echo "    make axl-start-b        Start AXL node B (provider)"
 	@echo "    make axl-stop           Stop all AXL nodes"
 	@echo "    make axl-smoke          Run AXL smoke test"
+	@echo ""
+	@echo "  SDK workspace"
+	@echo "    make sdk-typecheck      tsc --noEmit across the workspace"
+	@echo "    make sdk-test           bun test across the workspace"
+	@echo "    make gateway            Run the CCIP-Read gateway on :3000"
+	@echo ""
+	@echo "  Quickstart (examples/quickstart) — minimal CLI demo, 4 terminals"
+	@echo "    make quickstart-install   Install (one-time)"
+	@echo "    make quickstart-setup     One-time on-chain provider registration"
+	@echo "    make quickstart-gateway   T0: local CCIP-Read gateway"
+	@echo "    make quickstart-provider  T1: provider AXL bridge + agent"
+	@echo "    make quickstart-evaluator T2: 0G Compute evaluator"
+	@echo "    make quickstart-client    T3: run one buyer job end-to-end"
+	@echo "    make quickstart-clean     Wipe cached AXL keys + agentId"
+	@echo ""
+	@echo "  Comprehensive demo (examples/kelp-postmortem) — web UI + Phase 2"
+	@echo "    make demo-up                  Browser-ready in one command (gateway + setup + coord)"
+	@echo "    make demo-down                Tear everything down + free ports"
+	@echo "    make demo-register-providers  Register kelp providers + mint iNFTs"
+	@echo "    make demo-reset-inft          Re-mint a fresh pair of provider iNFTs"
 	@echo ""
 	@echo "  Other"
 	@echo "    make clean              Remove build artifacts"

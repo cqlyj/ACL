@@ -31,11 +31,12 @@ import { defineGalileoChain } from "./chains.js";
 
 /**
  * Default ENS host RPC. ACL agent records live on Sepolia (the
- * `*.acl.eth` domain is registered there); we use the BlastAPI public
- * endpoint as a sensible default for fresh checkouts. Production
- * consumers should pass their own URL via `sepoliaRpcUrl`.
+ * `*.acl.eth` domain is registered there); we point at PublicNode's
+ * free Sepolia endpoint as a sensible default for fresh checkouts.
+ * Production consumers should pass their own URL via `sepoliaRpcUrl`.
  */
-export const SEPOLIA_PUBLIC_RPC_URL = "https://eth-sepolia.public.blastapi.io" as const;
+export const SEPOLIA_PUBLIC_RPC_URL =
+  "https://ethereum-sepolia-rpc.publicnode.com" as const;
 
 /**
  * Default HTTP transport tuning. Public 0G testnet RPC (and other
@@ -240,12 +241,16 @@ export type GalileoClients = {
  * });
  * ```
  */
-export function createGalileoClients(opts: CreateGalileoClientsOptions = {}): GalileoClients {
+export function createGalileoClients(
+  opts: CreateGalileoClientsOptions = {},
+): GalileoClients {
   const deployment = opts.deployment ?? ACL_TESTNET;
   const chain = defineGalileoChain(deployment, opts.rpcUrl);
   const transport = http(opts.rpcUrl ?? deployment.galileo.rpcUrl, {
-    retryCount: opts.transportOptions?.retryCount ?? DEFAULT_TRANSPORT_RETRY_COUNT,
-    retryDelay: opts.transportOptions?.retryDelayMs ?? DEFAULT_TRANSPORT_RETRY_DELAY_MS,
+    retryCount:
+      opts.transportOptions?.retryCount ?? DEFAULT_TRANSPORT_RETRY_COUNT,
+    retryDelay:
+      opts.transportOptions?.retryDelayMs ?? DEFAULT_TRANSPORT_RETRY_DELAY_MS,
     timeout: opts.transportOptions?.timeoutMs ?? DEFAULT_TRANSPORT_TIMEOUT_MS,
   });
   const publicClient = createPublicClient({
@@ -257,7 +262,9 @@ export function createGalileoClients(opts: CreateGalileoClientsOptions = {}): Ga
     return {
       chain,
       publicClient,
-      ...(opts.gasFeeOverrides !== undefined ? { gasFeeOverrides: opts.gasFeeOverrides } : {}),
+      ...(opts.gasFeeOverrides !== undefined
+        ? { gasFeeOverrides: opts.gasFeeOverrides }
+        : {}),
     };
   }
   const account = toAccount(opts.account);
@@ -271,7 +278,9 @@ export function createGalileoClients(opts: CreateGalileoClientsOptions = {}): Ga
     publicClient,
     walletClient,
     account,
-    ...(opts.gasFeeOverrides !== undefined ? { gasFeeOverrides: opts.gasFeeOverrides } : {}),
+    ...(opts.gasFeeOverrides !== undefined
+      ? { gasFeeOverrides: opts.gasFeeOverrides }
+      : {}),
   };
 }
 
@@ -291,7 +300,8 @@ export function createEnsClient(
     chain: sepolia,
     transport: http(rpcUrl ?? SEPOLIA_PUBLIC_RPC_URL, {
       retryCount: transportOptions?.retryCount ?? DEFAULT_TRANSPORT_RETRY_COUNT,
-      retryDelay: transportOptions?.retryDelayMs ?? DEFAULT_TRANSPORT_RETRY_DELAY_MS,
+      retryDelay:
+        transportOptions?.retryDelayMs ?? DEFAULT_TRANSPORT_RETRY_DELAY_MS,
       timeout: transportOptions?.timeoutMs ?? DEFAULT_TRANSPORT_TIMEOUT_MS,
     }),
   });
