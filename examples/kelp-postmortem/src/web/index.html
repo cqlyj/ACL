@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ACL · Kelp DAO post-mortem</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">ACL</span>
+        <span class="brand-meta">Kelp DAO post-mortem</span>
+      </div>
+      <div class="topbar-right">
+        <span class="net-pill">0G Galileo · 16602</span>
+        <span id="status" class="status-pill" data-state="idle">idle</span>
+      </div>
+    </header>
+
+    <section class="actions">
+      <div class="actions-buttons">
+        <button id="btn-start" class="btn btn-primary">Start agents</button>
+        <button id="btn-run" class="btn btn-secondary" disabled>Run job</button>
+      </div>
+      <p class="actions-hint">
+        Client commissions a post-mortem of the April 2026 Kelp DAO bridge
+        exploit. Two providers compete on AXL; one is picked, evaluator settles
+        on chain with a TEE-attested verdict. On approval, the client&rsquo;s
+        LLM decides whether to acquire the provider&rsquo;s persona iNFT (Phase
+        2).
+      </p>
+    </section>
+
+    <!-- ───────── Stage ───────── -->
+    <section class="stage" id="stage">
+      <div class="stage-grid">
+        <!-- Left: client tile -->
+        <article class="tile tile-client" id="tile-client" data-role="client">
+          <div class="tile-head">
+            <span class="tile-role">client</span>
+            <span class="tile-state" id="client-state">offline</span>
+          </div>
+          <div class="tile-body">
+            <a
+              class="tile-addr"
+              id="client-addr"
+              href="#"
+              target="_blank"
+              rel="noopener"
+              >&mdash;</a
+            >
+            <div class="tile-ens" id="client-ens">&mdash;</div>
+            <div class="tile-chips" id="client-chips"></div>
+          </div>
+          <div class="tile-extra" id="client-extra" hidden></div>
+        </article>
+
+        <!-- Middle: two providers stacked -->
+        <article
+          class="tile tile-provider"
+          id="tile-provider-security"
+          data-role="provider-security"
+        >
+          <div class="tile-head">
+            <span class="tile-role">provider · security</span>
+            <span class="tile-state" id="security-state">offline</span>
+          </div>
+          <div class="tile-body">
+            <a
+              class="tile-addr"
+              id="security-addr"
+              href="#"
+              target="_blank"
+              rel="noopener"
+              >&mdash;</a
+            >
+            <div class="tile-ens" id="security-ens">&mdash;</div>
+            <div class="tile-chips" id="security-chips"></div>
+          </div>
+        </article>
+
+        <article
+          class="tile tile-provider"
+          id="tile-provider-generalist"
+          data-role="provider-generalist"
+        >
+          <div class="tile-head">
+            <span class="tile-role">provider · generalist</span>
+            <span class="tile-state" id="generalist-state">offline</span>
+          </div>
+          <div class="tile-body">
+            <a
+              class="tile-addr"
+              id="generalist-addr"
+              href="#"
+              target="_blank"
+              rel="noopener"
+              >&mdash;</a
+            >
+            <div class="tile-ens" id="generalist-ens">&mdash;</div>
+            <div class="tile-chips" id="generalist-chips"></div>
+          </div>
+        </article>
+
+        <!-- Right: evaluator -->
+        <article
+          class="tile tile-evaluator"
+          id="tile-evaluator"
+          data-role="evaluator"
+          data-mode="tbd"
+        >
+          <div class="tile-head">
+            <span class="tile-role">evaluator</span>
+            <span class="tile-state" id="evaluator-state"
+              >tbd · negotiating</span
+            >
+          </div>
+          <div class="tile-body">
+            <a
+              class="tile-addr"
+              id="evaluator-addr"
+              href="#"
+              target="_blank"
+              rel="noopener"
+              >&mdash;</a
+            >
+            <div class="tile-ens" id="evaluator-mode">delegate</div>
+            <div class="tile-chips" id="evaluator-chips"></div>
+            <div class="verify-strip" id="evaluator-verify" hidden></div>
+          </div>
+        </article>
+
+        <!-- AXL edges layer (sits BEHIND the tiles) -->
+        <div class="axl-edges-layer" id="axl-edges-layer">
+          <svg class="axl-edges" id="axl-edges" aria-hidden="true">
+            <line
+              class="axl-line"
+              data-edge="client-security"
+              data-state="hidden"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="0"
+            />
+            <line
+              class="axl-line"
+              data-edge="client-generalist"
+              data-state="hidden"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="0"
+            />
+          </svg>
+        </div>
+        <!--
+          AXL packet + pin overlay (sits ABOVE the tiles).
+          Split from the edges layer so packet chips and verb pins render
+          on top of the dossier cards rather than getting clipped behind
+          them; #axl-overlay is what `diagram.js` appends packets to.
+        -->
+        <div class="axl-overlay" id="axl-overlay">
+          <div
+            class="axl-edge-anchor"
+            data-edge="client-security"
+            id="anchor-client-security"
+          >
+            <div class="axl-pin" data-edge="client-security"></div>
+          </div>
+          <div
+            class="axl-edge-anchor"
+            data-edge="client-generalist"
+            id="anchor-client-generalist"
+          >
+            <div class="axl-pin" data-edge="client-generalist"></div>
+          </div>
+          <div class="inft-flight-layer" id="inft-flight-layer"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── Chain row ───────── -->
+    <section class="chain-row" id="chain-row" data-phase="1">
+      <div class="chain-row-head">
+        <span class="chain-row-label">on-chain</span>
+        <span class="chain-row-contract" id="chain-row-contract"
+          >AgenticCommerce · ERC-8183</span
+        >
+        <span class="chain-row-jobid" id="chain-row-jobid">
+          <span class="chain-row-jobid-label">jobId</span>
+          <span class="chain-row-jobid-value" id="chain-jobid-value"
+            >&mdash;</span
+          >
+          <span class="chain-row-jobid-phase" id="chain-jobid-phase"
+            >phase 1</span
+          >
+        </span>
+      </div>
+      <ol class="chain-steps" id="chain-steps">
+        <li class="chain-step" data-step="createJob">
+          <span class="chain-step-num">1</span>
+          <span class="chain-step-name">createJob</span>
+          <span class="chain-step-tx" data-step-tx="createJob"></span>
+        </li>
+        <li class="chain-step" data-step="setProvider">
+          <span class="chain-step-num">2</span>
+          <span class="chain-step-name">setProvider</span>
+          <span class="chain-step-tx" data-step-tx="setProvider"></span>
+        </li>
+        <li class="chain-step" data-step="setBudget">
+          <span class="chain-step-num">3</span>
+          <span class="chain-step-name">setBudget</span>
+          <span class="chain-step-tx" data-step-tx="setBudget"></span>
+        </li>
+        <li class="chain-step" data-step="fund">
+          <span class="chain-step-num">4</span>
+          <span class="chain-step-name">fund</span>
+          <span class="chain-step-tx" data-step-tx="fund"></span>
+        </li>
+        <li class="chain-step" data-step="submit">
+          <span class="chain-step-num">5</span>
+          <span class="chain-step-name">submit</span>
+          <span class="chain-step-tx" data-step-tx="submit"></span>
+        </li>
+        <li class="chain-step" data-step="settle">
+          <span class="chain-step-num">6</span>
+          <span class="chain-step-name">settle</span>
+          <span class="chain-step-tx" data-step-tx="settle"></span>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ───────── Evidence rail ───────── -->
+    <section class="evidence-rail" id="evidence-rail">
+      <details class="evidence-section" data-section="discovery" open>
+        <summary>
+          <span class="ev-num">01</span>
+          <span class="ev-title">Discovery · ENS / CCIP-Read</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-discovery"></div>
+      </details>
+
+      <details class="evidence-section" data-section="rank">
+        <summary>
+          <span class="ev-num">02</span>
+          <span class="ev-title">LLM rank · best-first</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-rank"></div>
+      </details>
+
+      <details class="evidence-section" data-section="taskspec">
+        <summary>
+          <span class="ev-num">03</span>
+          <span class="ev-title">TaskSpec · LLM-authored</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-taskspec"></div>
+      </details>
+
+      <details class="evidence-section" data-section="negotiation">
+        <summary>
+          <span class="ev-num">04</span>
+          <span class="ev-title">AXL negotiation · EIP-712 transcript</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-negotiation">
+          <ol class="negotiation-log" id="negotiation-log"></ol>
+        </div>
+      </details>
+
+      <details class="evidence-section" data-section="escrow">
+        <summary>
+          <span class="ev-num">05</span>
+          <span class="ev-title">Escrow · ERC-8183 transitions</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-escrow">
+          <ul class="escrow-list" id="escrow-list"></ul>
+        </div>
+      </details>
+
+      <details class="evidence-section" data-section="deliverable">
+        <summary>
+          <span class="ev-num">06</span>
+          <span class="ev-title">Deliverable · 0G Storage</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-deliverable"></div>
+      </details>
+
+      <details class="evidence-section" data-section="evaluation">
+        <summary>
+          <span class="ev-num">07</span>
+          <span class="ev-title">Evaluation · 0G Compute TEE proof</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-evaluation"></div>
+      </details>
+
+      <details class="evidence-section" data-section="hooks">
+        <summary>
+          <span class="ev-num">08</span>
+          <span class="ev-title">Settlement &amp; hooks</span>
+          <span class="ev-pill" data-state="idle">idle</span>
+        </summary>
+        <div class="ev-body" id="ev-hooks"></div>
+      </details>
+    </section>
+
+    <!-- ───────── Footer ───────── -->
+    <section class="footing">
+      <details class="deployment-panel" open>
+        <summary>Deployment + identity</summary>
+        <div class="deployment-grid">
+          <div class="deployment-col">
+            <h3>Contracts</h3>
+            <ul id="deployment-list" class="kv"></ul>
+          </div>
+          <div class="deployment-col">
+            <h3>Agents</h3>
+            <ul id="agent-roster" class="kv"></ul>
+          </div>
+        </div>
+      </details>
+
+      <details class="timeline-panel">
+        <summary>Event timeline</summary>
+        <ol id="timeline" class="timeline-list"></ol>
+      </details>
+    </section>
+
+    <!-- ───────── Storage modal ───────── -->
+    <div id="storage-modal" class="storage-modal" hidden>
+      <div class="storage-modal-backdrop" data-action="close"></div>
+      <article
+        class="storage-modal-frame"
+        role="dialog"
+        aria-labelledby="storage-modal-title"
+      >
+        <header class="storage-modal-head">
+          <div class="storage-modal-title-block">
+            <span class="storage-modal-tag" id="storage-modal-tag"
+              >storage payload</span
+            >
+            <h2 id="storage-modal-title">0G Storage</h2>
+          </div>
+          <div class="storage-modal-meta" id="storage-modal-meta"></div>
+          <button
+            class="storage-modal-close"
+            type="button"
+            data-action="close"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </header>
+        <div class="storage-modal-body" id="storage-modal-body">
+          <p class="ev-empty">Loading&hellip;</p>
+        </div>
+      </article>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
