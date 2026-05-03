@@ -34,12 +34,24 @@
         "@acl/discovery": "workspace:*",
         "@acl/inft": "workspace:*",
         "@acl/storage": "workspace:*",
-        "ethers": "^6.13.4",
         "hono": "^4.12.14",
         "viem": "^2.21.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
+        "@types/bun": "^1.2.0",
+        "@types/node": "^22.10.2",
+        "typescript": "^5.6.3",
+      },
+    },
+    "../examples/quickstart": {
+      "name": "@acl/quickstart",
+      "version": "0.0.0",
+      "dependencies": {
+        "@acl/agent": "workspace:*",
+        "viem": "^2.40.0",
+      },
+      "devDependencies": {
         "@types/bun": "^1.2.0",
         "@types/node": "^22.10.2",
         "typescript": "^5.6.3",
@@ -55,6 +67,7 @@
         "@acl/core": "workspace:*",
         "@acl/discovery": "workspace:*",
         "@acl/evaluation": "workspace:*",
+        "@acl/inft": "workspace:*",
         "@acl/negotiation": "workspace:*",
         "@acl/settlement": "workspace:*",
         "@acl/storage": "workspace:*",
@@ -157,6 +170,8 @@
     "@acl/inft": ["@acl/inft@workspace:packages/inft"],
 
     "@acl/negotiation": ["@acl/negotiation@workspace:packages/negotiation"],
+
+    "@acl/quickstart": ["@acl/quickstart@workspace:../examples/quickstart"],
 
     "@acl/settlement": ["@acl/settlement@workspace:packages/settlement"],
 
